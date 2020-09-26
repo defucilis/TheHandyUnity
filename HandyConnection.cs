@@ -31,7 +31,7 @@ namespace Defucilis.TheHandyUnity
         //                                                                                                            //
         //============================================================================================================//
 
-        public static async void SetMode(HandyStatus status, Action<HandyStatus> onSuccess = null, Action<string> onError = null)
+        public static void SetMode(HandyStatus status, Action<HandyStatus> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
                 "Set Mode", 
@@ -53,7 +53,7 @@ namespace Defucilis.TheHandyUnity
             );
         }
         
-        public static async void ToggleMode(HandyStatus status, Action<HandyStatus> onSuccess = null, Action<string> onError = null)
+        public static void ToggleMode(HandyStatus status, Action<HandyStatus> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
                 "Toggle Mode", 
@@ -75,7 +75,7 @@ namespace Defucilis.TheHandyUnity
             );
         }
 
-        public static async void SetSpeedPercent(int percent, Action<HandyStatusData> onSuccess = null, Action<string> onError = null)
+        public static void SetSpeedPercent(int percent, Action<HandyStatusData> onSuccess = null, Action<string> onError = null)
         {
             //ensure we're in automatic mode before setting speed
             EnforceMode(HandyStatus.Automatic, () =>
@@ -102,7 +102,7 @@ namespace Defucilis.TheHandyUnity
             }, onError);
         }
         
-        public static async void SetSpeed(float speedMm, Action<HandyStatusData> onSuccess = null, Action<string> onError = null)
+        public static void SetSpeed(float speedMm, Action<HandyStatusData> onSuccess = null, Action<string> onError = null)
         {
             //ensure we're in automatic mode before setting speed
             EnforceMode(HandyStatus.Automatic, () =>
@@ -129,7 +129,7 @@ namespace Defucilis.TheHandyUnity
             }, onError);
         }
         
-        public static async void StepSpeedUp(Action<HandySpatialData> onSuccess = null, Action<string> onError = null)
+        public static void StepSpeedUp(Action<HandySpatialData> onSuccess = null, Action<string> onError = null)
         {
             //ensure we're in automatic mode before setting speed
             EnforceMode(HandyStatus.Automatic, () =>
@@ -156,7 +156,7 @@ namespace Defucilis.TheHandyUnity
             }, onError);
         }
         
-        public static async void StepSpeedDown(Action<HandySpatialData> onSuccess = null, Action<string> onError = null)
+        public static void StepSpeedDown(Action<HandySpatialData> onSuccess = null, Action<string> onError = null)
         {
             //ensure we're in automatic mode before setting speed
             EnforceMode(HandyStatus.Automatic, () =>
@@ -183,7 +183,7 @@ namespace Defucilis.TheHandyUnity
             }, onError);
         }
 
-        public static async void SetStrokePercent(int percent, Action<HandyStatusData> onSuccess = null, Action<string> onError = null)
+        public static void SetStrokePercent(int percent, Action<HandyStatusData> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
                 "Set Stroke (Percent)", 
@@ -206,7 +206,7 @@ namespace Defucilis.TheHandyUnity
             );
         }
         
-        public static async void SetStroke(float strokeMm, Action<HandyStatusData> onSuccess = null, Action<string> onError = null)
+        public static void SetStroke(float strokeMm, Action<HandyStatusData> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
                 "Set Stroke (mm)", 
@@ -229,7 +229,7 @@ namespace Defucilis.TheHandyUnity
             );
         }
         
-        public static async void StepStrokeUp(Action<HandySpatialData> onSuccess = null, Action<string> onError = null)
+        public static void StepStrokeUp(Action<HandySpatialData> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
                 "Step Stroke Up", 
@@ -252,7 +252,7 @@ namespace Defucilis.TheHandyUnity
             );
         }
         
-        public static async void StepStrokeDown(Action<HandySpatialData> onSuccess = null, Action<string> onError = null)
+        public static void StepStrokeDown(Action<HandySpatialData> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
                 "Step Stroke Down", 
@@ -326,7 +326,7 @@ namespace Defucilis.TheHandyUnity
             );
         }
         
-        public static async void GetStatus(Action<HandyStatus> onSuccess = null, Action<string> onError = null)
+        public static void GetStatus(Action<HandyStatus> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
                 "Get Status", 
@@ -347,27 +347,27 @@ namespace Defucilis.TheHandyUnity
         //                                                                                                            //
         //============================================================================================================//
 
-        public static async void GetServerTime(Action<float> onSuccess = null, Action<string> onError = null)
+        public static void GetServerTime(Action<float> onSuccess = null, Action<string> onError = null)
         {
             
         }
 
-        public static async void SyncPrepare(string url, string fileName = "", int fileSize = -1, Action onSuccess = null, Action<string> onError = null)
+        public static void SyncPrepare(string url, string fileName = "", int fileSize = -1, Action onSuccess = null, Action<string> onError = null)
         {
             
         }
 
-        public static async void SyncPlay(int time = 0, long serverTime = -1, Action<HandyPlayingData> onSuccess = null, Action<string> onError = null)
+        public static void SyncPlay(int time = 0, long serverTime = -1, Action<HandyPlayingData> onSuccess = null, Action<string> onError = null)
         {
             
         }
         
-        public static async void SyncPause(Action<HandyPlayingData> onSuccess = null, Action<string> onError = null)
+        public static void SyncPause(Action<HandyPlayingData> onSuccess = null, Action<string> onError = null)
         {
             
         }
 
-        public static async void SyncOffset(int offset, Action<HandyPlayingData> onSuccess = null, Action<string> onError = null)
+        public static void SyncOffset(int offset, Action<HandyPlayingData> onSuccess = null, Action<string> onError = null)
         {
             
         }
