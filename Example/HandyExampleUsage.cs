@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -203,10 +204,10 @@ namespace Defucilis.TheHandyUnity
             //These operations are for synchronizing the Handy with funscripts, CSV, or other sequenced stroke patterns
             
             //Get Server Time
-            transform.Find("Body/Right/GetServerTime/Load").GetComponent<Button>().onClick.AddListener(() => {
+            transform.Find("Body/Left/GetServerTime/Load").GetComponent<Button>().onClick.AddListener(() => {
                 SetError("");
                 HandyConnection.GetServerTime(30, data => {
-                    transform.Find("Body/Right/GetServerTime").GetComponent<InputField>().text = data.ToString("0");
+                    transform.Find("Body/Left/GetServerTime").GetComponent<InputField>().text = data.ToString("0");
                 }, SetError);
             });
             
@@ -255,6 +256,43 @@ namespace Defucilis.TheHandyUnity
             var speed = transform.Find("Body/Right/CreatePattern/SpeedSlider").GetComponent<Slider>();
             var speedValue = transform.Find("Body/Right/CreatePattern/SpeedSlider/InputField").GetComponent<InputField>();
             speed.onValueChanged.AddListener(newValue => speedValue.text = newValue.ToString("0"));
+            
+            //Upload a .funscript or .csv file to the handyfeeling.com servers
+            transform.Find("Body/Right/UploadFile/Upload").GetComponent<Button>().onClick.AddListener(() =>  {
+                var path = transform.Find("Body/Right/UploadFile").GetComponent<InputField>().text;
+                var fileContents = "";
+                var fileName = "";
+                var extension = "";
+                try {
+                    var file = new FileInfo(path);
+                    fileName = file.Name;
+                    extension = file.Extension;
+                    var reader = new StreamReader(path);
+                    fileContents = reader.ReadToEnd();
+                    reader.Close();
+                } catch (Exception e) {
+                    SetError("Failed to read file - " + e.Message);
+                    return;
+                }
+
+                if (extension == ".csv") {
+                    HandyConnection.CsvToUrl(
+                        fileContents,
+                        fileName,
+                        url => transform.Find("Body/Right/CreatePattern/Url").GetComponent<InputField>().text = url,
+                        SetError
+                    );
+                } else if (extension == ".funscript") {
+                    HandyConnection.FunscriptToUrl(
+                        fileContents,
+                        fileName,
+                        url => transform.Find("Body/Right/CreatePattern/Url").GetComponent<InputField>().text = url,
+                        SetError
+                    );
+                } else {
+                    SetError("Invalid file selected");
+                }
+            });
         }
 
         //This is an example showing how to generate patterns to be converted into CSV for playback

@@ -687,14 +687,15 @@ namespace Defucilis.TheHandyUnity
                 OnCommandEnd?.Invoke();
             }
         }
-        
+
         /// <summary>
         /// Converts a funscript to a CSV file hosted on Handy's servers, ready to be loaded onto a Handy using PrepareSync
         /// </summary>
         /// <param name="funscript">The funscript to be loaded, as a string</param>
+        /// <param name="fileName">Optional filename, one will be generated if left off</param>
         /// <param name="onSuccess">Callback indicating success, contains the URL of the newly created CSV file</param>
         /// <param name="onError">Callback indicating failure, contains the error message</param>
-        public static async void FunscriptToUrl(string funscript, Action<string> onSuccess = null, Action<string> onError = null)
+        public static async void FunscriptToUrl(string funscript, string fileName = "", Action<string> onSuccess = null, Action<string> onError = null)
         {
             const string commandDescription = "Funscript to URL";
             OnCommandStart?.Invoke();
@@ -711,7 +712,9 @@ namespace Defucilis.TheHandyUnity
 
                 var response = await PostAsync(
                     "https://www.handyfeeling.com/api/sync/upload", 
-                    $"UnityGenerated_{DateTimeOffset.Now.ToUnixTimeMilliseconds()}.funscript", 
+                    string.IsNullOrEmpty(fileName)
+                        ? $"UnityGenerated_{DateTimeOffset.Now.ToUnixTimeMilliseconds()}.funscript"
+                        : fileName, 
                     new MemoryStream(bytes)
                 );
                 var responseJson = JSONNode.Parse(response);
@@ -725,14 +728,15 @@ namespace Defucilis.TheHandyUnity
                 OnCommandEnd?.Invoke();
             }
         }
-        
+
         /// <summary>
         /// Uploads a CSV file to Handy's servers, ready to be loaded onto a Handy using PrepareSync
         /// </summary>
         /// <param name="csv">The CSV to be loaded, as a string. Each line should be in the format [time (ms)],[position (%)]</param>
+        /// <param name="fileName">Optional filename, one will be generated if left off</param>
         /// <param name="onSuccess">Callback indicating success, contains the URL of the newly uploaded CSV file</param>
         /// <param name="onError">Callback indicating failure, contains the error message</param>
-        public static async void CsvToUrl(string csv, Action<string> onSuccess = null, Action<string> onError = null)
+        public static async void CsvToUrl(string csv, string fileName = "", Action<string> onSuccess = null, Action<string> onError = null)
         {
             const string commandDescription = "CSV to URL";
             OnCommandStart?.Invoke();
@@ -749,7 +753,9 @@ namespace Defucilis.TheHandyUnity
 
                 var response = await PostAsync(
                     "https://www.handyfeeling.com/api/sync/upload", 
-                    $"UnityGenerated_{DateTimeOffset.Now.ToUnixTimeMilliseconds()}.csv", 
+                    string.IsNullOrEmpty(fileName)
+                        ? $"UnityGenerated_{DateTimeOffset.Now.ToUnixTimeMilliseconds()}.csv"
+                        : fileName, 
                     new MemoryStream(bytes)
                 );
                 var responseJson = JSONNode.Parse(response);
