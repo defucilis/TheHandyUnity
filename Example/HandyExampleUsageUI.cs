@@ -6,7 +6,7 @@ using UnityEngine.UI;
 
 namespace Defucilis.TheHandyUnity
 {
-    public class HandyExampleUsage : MonoBehaviour
+    public class HandyExampleUsageUI : MonoBehaviour
     {
         public HandyLogMode LogMode = HandyLogMode.Verbose;
 
@@ -417,7 +417,6 @@ namespace Defucilis.TheHandyUnity
 
         private void SetError(string error)
         {
-            Debug.Log(error);
             if (_errorText == null) _errorText = transform.Find("Footer/ErrorText").GetComponent<Text>();
             _errorText.text = error;
         }

@@ -456,6 +456,7 @@ namespace Defucilis.TheHandyUnity
         /// Runs a series of checks to determine the server time sync offset value
         /// This is important if you want the Handy's movements to stay in-sync with locally-playing video content!
         /// Once this function completes, the value of ServerTimeOffset is automatically updated, and will be applied whenever relevant
+        /// Be warned! You only have 120 API calls per hour per device and each trip taken during this function counts as one of them!
         /// </summary>
         /// <param name="trips">How many requests to make. The offset value is the average offset time for each trip. Accuracy improves with more trips, the API recommends 30</param>
         /// <param name="onSuccess">Callback indicating success, contains the newly calculated server time offset</param>
