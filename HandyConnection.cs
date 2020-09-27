@@ -19,6 +19,7 @@ namespace Defucilis.TheHandyUnity
         
         public static string ConnectionKey { get; set; }
         public static HandyStatus Status { get; set; }
+        public static long ServerTimeOffset { get; private set; }
         public static HandyLogMode LogMode { get; set; }
 
         public static Action OnCommandStart { get; set; }
@@ -347,29 +348,199 @@ namespace Defucilis.TheHandyUnity
         //                                                                                                            //
         //============================================================================================================//
 
-        public static void GetServerTime(Action<float> onSuccess = null, Action<string> onError = null)
+        public static async void GetServerTime(int trips = 30, Action<long> onSuccess = null, Action<string> onError = null)
         {
+            const string commandDescription = "Get Server Time";
             
+            OnCommandStart?.Invoke();
+            TryLogVerbose(commandDescription);
+            
+            if (CheckConnectionKey(commandDescription, onError)) {
+                OnCommandEnd?.Invoke();
+                return;
+            }
+
+            var offsetAggregate = 0L;
+            for (var i = 0; i < trips; i++) {
+                var startTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+
+                var response = await GetAsync(GetUrl("getServerTime"));
+                var responseJson = (JSONObject)JSONNode.Parse(response);
+                TryLogResponse(commandDescription, responseJson);
+
+                if (responseJson["error"] != null) {
+                    TryLogError(commandDescription, responseJson["error"], onError);
+                    OnCommandEnd?.Invoke();
+                    return;
+                }
+
+                var endTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+                var rtd = endTime - startTime;
+                var estimatedServerTime = long.Parse(responseJson["serverTime"]) + rtd / 2;
+                var offset = estimatedServerTime - endTime;
+                offsetAggregate += offset;
+            }
+
+            offsetAggregate /= trips;
+            ServerTimeOffset = offsetAggregate;
+            if ((int) LogMode >= (int) HandyLogMode.Verbose) {
+                Debug.Log($"<color=blue>Calculated server offset as {ServerTimeOffset} milliseconds</color>");
+            }
+            
+            onSuccess?.Invoke(ServerTimeOffset);
+            OnCommandEnd?.Invoke();
         }
 
         public static void SyncPrepare(string url, string fileName = "", int fileSize = -1, Action onSuccess = null, Action<string> onError = null)
         {
-            
+            DoCommand(
+                "Sync Prepare", 
+                async () => {
+                    var urlParams = new Dictionary<string, string>
+                    {
+                        {"url", url}
+                    };
+                    if (!string.IsNullOrEmpty(fileName)) urlParams.Add("name", fileName);
+                    if (fileSize > 0) urlParams.Add("size", fileSize.ToString());
+                    urlParams.Add("timeout", "30000"); //30 seconds - to account for larger files
+                    
+                    var response = await GetAsync(GetUrl("syncPrepare", urlParams));
+                    return response;
+                }, 
+                responseJson => {
+                    //This command sets the Handy mode to Sync automatically
+                    if (Status != HandyStatus.Sync) {
+                        Status = HandyStatus.Sync;
+                        OnStatusChanged?.Invoke(Status);
+                    }
+
+                    onSuccess?.Invoke();
+                }, 
+                onError
+            );
         }
 
-        public static void SyncPlay(int time = 0, long serverTime = -1, Action<HandyPlayingData> onSuccess = null, Action<string> onError = null)
+        public static void SyncPlay(int time = 0, Action<HandyPlayingData> onSuccess = null, Action<string> onError = null)
         {
-            
+            //Ensure we're in sync mode before sync playing
+            EnforceMode(HandyStatus.Sync, () =>
+            {
+                DoCommand(
+                    "Sync Play",
+                    async () =>
+                    {
+                        var urlParams = new Dictionary<string, string>
+                        {
+                            {"play", "true"}
+                        };
+                        if (time > 0) urlParams.Add("time", time.ToString());
+                        if (ServerTimeOffset != 0) {
+                            var estimatedServerTime = DateTimeOffset.Now.ToUnixTimeMilliseconds() + ServerTimeOffset;
+                            urlParams.Add("serverTime", estimatedServerTime.ToString());
+                        }
+
+                        var response = await GetAsync(GetUrl("syncPlay", urlParams));
+                        return response;
+                    },
+                    responseJson =>
+                    {
+                        onSuccess?.Invoke(new HandyPlayingData()
+                        {
+                            Playing = responseJson["playing"].AsBool,
+                            SetOffset = responseJson["setOffset"].AsInt
+                        });
+                    },
+                    onError
+                );
+            }, onError);
         }
         
         public static void SyncPause(Action<HandyPlayingData> onSuccess = null, Action<string> onError = null)
         {
-            
+            DoCommand(
+                "Sync Pause", 
+                async () => {
+                    var urlParams = new Dictionary<string, string>
+                    {
+                        {"play", "false"}
+                    };
+                    if (ServerTimeOffset != 0) {
+                        var estimatedServerTime = DateTimeOffset.Now.ToUnixTimeMilliseconds() + ServerTimeOffset;
+                        urlParams.Add("serverTime", estimatedServerTime.ToString());
+                    }
+
+                    var response = await GetAsync(GetUrl("syncPlay", urlParams));
+                    return response;
+                }, 
+                responseJson => {
+                    onSuccess?.Invoke(new HandyPlayingData()
+                    {
+                        Playing = responseJson["playing"].AsBool
+                    });
+                }, 
+                onError
+            );
         }
 
         public static void SyncOffset(int offset, Action<HandyPlayingData> onSuccess = null, Action<string> onError = null)
         {
-            
+            DoCommand(
+                "Sync Offset",
+                async () =>
+                {
+                    var urlParams = new Dictionary<string, string>
+                    {
+                        {"offset", offset.ToString()}
+                    };
+                    var response = await GetAsync(GetUrl("syncOffset", urlParams));
+                    return response;
+                },
+                responseJson =>
+                {
+                    onSuccess?.Invoke(new HandyPlayingData()
+                    {
+                        SetOffset = responseJson["offset"].AsInt
+                    });
+                },
+                onError
+            );
+        }
+
+        public static async void PatternToUrl(Vector2Int[] patternData, Action<string> onSuccess = null, Action<string> onError = null)
+        {
+            const string commandDescription = "Pattern to URL";
+            OnCommandStart?.Invoke();
+            TryLogVerbose(commandDescription);
+
+            if (patternData == null || patternData.Length == 0) {
+                TryLogError(commandDescription, "No pattern data provided", onError);
+                OnCommandEnd?.Invoke();
+                return;
+            }
+
+            try {
+                var csv = "#{\"type\":\"handy\"}";
+                foreach (var item in patternData) {
+                    csv += $"\n{item.x},{item.y}";
+                }
+
+                var bytes = Encoding.ASCII.GetBytes(csv);
+
+                var response = await PostAsync(
+                    "https://www.handyfeeling.com/api/sync/upload", 
+                    $"UnityGenerated_{DateTimeOffset.Now.ToUnixTimeMilliseconds()}.csv", 
+                    new MemoryStream(bytes)
+                );
+                var responseJson = JSONNode.Parse(response);
+                TryLogResponse(commandDescription, responseJson);
+
+                var url = responseJson["url"] == null ? "" : (string) responseJson["url"];
+                onSuccess?.Invoke(url);
+                OnCommandEnd?.Invoke();
+            } catch (Exception e) {
+                TryLogError(commandDescription, "Unexpected error: " + e.Message, onError);
+                OnCommandEnd?.Invoke();
+            }
         }
         
         
@@ -453,8 +624,8 @@ namespace Defucilis.TheHandyUnity
         private static bool ReportErrors(string commandDescription, JSONNode responseJson, Action<string> onError)
         {
             var error = string.Empty;
-            if (responseJson["success"].IsNull) error = "Invalid response";
-            if (!responseJson["success"].AsBool) error = responseJson["error"].IsNull 
+            if (responseJson["success"] == null) error = "Invalid response";
+            if (!responseJson["success"].AsBool) error = responseJson["error"] == null 
                 ? "Unknown error" 
                 : (string)responseJson["error"];
 
@@ -466,105 +637,7 @@ namespace Defucilis.TheHandyUnity
             return true;
         }
 
-        public static async void ConnectAsync(string connectionKey)
-        {
-            if (connectionKey == "") {
-                var output = new JSONObject();
-                output.Add("error", "No connection key provided");
-                //OnResponse.Invoke(this, output);
-            }
-
-            ConnectionKey = connectionKey;
-            var result = await GetAsync(GetUrl("getStatus"));
-            //OnResponse.Invoke(this, JSONNode.Parse(result));
-        }
-
-        public static async void SetSpeedAsync(float speed)
-        {
-            if (Status != HandyStatus.Off && speed <= 0f) {
-                var modeResult = await GetAsync(GetUrl("setMode", new Dictionary<string, string>
-                {
-                    {"mode", ((int) HandyStatus.Off).ToString()}
-                }));
-                //OnResponse.Invoke(this, JSONNode.Parse(modeResult));
-                Status = HandyStatus.Off;
-                return;
-            } else if (Status == HandyStatus.Off && speed > 0f) {
-                var modeResult = await GetAsync(GetUrl("setMode", new Dictionary<string, string>
-                {
-                    {"mode", ((int) HandyStatus.Automatic).ToString()}
-                }));
-                Status = HandyStatus.Automatic;
-                //OnResponse.Invoke(this, JSONNode.Parse(modeResult));
-            }
-
-            var result = await GetAsync(GetUrl("setSpeed", new Dictionary<string, string>
-            {
-                {"speed", (speed * 100f).ToString("0")},
-                {"type", "%25"}
-            }));
-            //OnResponse.Invoke(this, JSONNode.Parse(result));
-        }
-
-        public static async void SetStrokeAsync(float stroke)
-        {
-            var result = await GetAsync(GetUrl("setStroke", new Dictionary<string, string>
-            {
-                {"stroke", (stroke * 100f).ToString("0")},
-                {"type", "%25"}
-            }));
-            //OnResponse.Invoke(this, JSONNode.Parse(result));
-        }
-
-        public static async void GetCsvUrl(Vector2Int[] data, Action<string> onConversionComplete)
-        {
-            var csv = "#{\"type\":\"handy\"}";
-            foreach (var item in data) {
-                csv += $"\n{item.x},{item.y}";
-            }
-
-            var bytes = Encoding.ASCII.GetBytes(csv);
-            var result = await PostAsync("https://www.handyfeeling.com/api/sync/upload", new MemoryStream(bytes));
-            Debug.Log(result);
-            var json = JSONNode.Parse(result);
-            var url = json["url"].IsNull ? "" : json["url"].ToString().Replace("\"", "");
-            Debug.Log(url);
-            if (!string.IsNullOrEmpty(url)) {
-                var prepareResponse = await PrepareSync(url, bytes.Length);
-                Debug.Log(prepareResponse);
-            }
-
-            onConversionComplete?.Invoke(url);
-            //OnResponse.Invoke(this, JSONNode.Parse(result));
-        }
-
-        public static async Task<string> PrepareSync(string url, int size)
-        {
-            return await GetAsync(GetUrl("syncPrepare", new Dictionary<string, string>
-            {
-                {"url", url},
-                {"timeout", "30000"} //30 seconds
-            }));
-        }
-
-        public async Task<string> SyncPlay(int time = 0)
-        {
-            return await GetAsync(GetUrl("syncPlay", new Dictionary<string, string>
-            {
-                {"play", "true"},
-                {"time", time.ToString()}
-            }));
-        }
-
-        public async Task<string> SyncPause()
-        {
-            return await GetAsync(GetUrl("syncPlay", new Dictionary<string, string>
-            {
-                {"play", "false"}
-            }));
-        }
-
-        public static async Task<string> GetAsync(string uri)
+        private static async Task<string> GetAsync(string uri)
         {
             var response = await Client.GetAsync(uri);
             try {
@@ -576,12 +649,12 @@ namespace Defucilis.TheHandyUnity
             return await response.Content.ReadAsStringAsync();
         }
 
-        public static async Task<string> PostAsync(string uri, Stream file)
+        private static async Task<string> PostAsync(string uri, string fileName, Stream file)
         {
             var content = new MultipartFormDataContent
             {
                 {
-                    new StreamContent(file), "syncFile", "test.csv"
+                    new StreamContent(file), "syncFile", fileName
                 }
             };
             var response = await Client.PostAsync(uri, content);
@@ -611,7 +684,6 @@ namespace Defucilis.TheHandyUnity
                 first = false;
             }
 
-            Debug.Log(url);
             return url;
         }
     }

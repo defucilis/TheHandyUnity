@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -196,10 +197,190 @@ namespace Defucilis.TheHandyUnity
                     strokeMmNumber.text = data.RawValue.ToString("0");
                 }, SetError);
             });
+            
+            
+            
+            
+            //These operations are for synchronizing the Handy with funscripts, CSV, or other sequenced stroke patterns
+            
+            //Get Server Time
+            transform.Find("Body/Right/GetServerTime/Load").GetComponent<Button>().onClick.AddListener(() => {
+                SetError("");
+                HandyConnection.GetServerTime(30, data => {
+                    transform.Find("Body/Right/GetServerTime").GetComponent<InputField>().text = data.ToString("0");
+                }, SetError);
+            });
+            
+            //Sync Prepare (with pre-existing CSV url)
+            //To test, try the example CSV from the API docs:
+            //        https://sweettecheu.s3.eu-central-1.amazonaws.com/scripts/admin/dataset.csv
+            transform.Find("Body/Right/SyncPrepare/Send").GetComponent<Button>().onClick.AddListener(() => {
+                SetError("");
+                HandyConnection.SyncPrepare(transform.Find("Body/Right/SyncPrepare").GetComponent<InputField>().text,
+                    "", -1, null, SetError);
+            });
+            
+            //Sync Play/Pause
+            transform.Find("Body/Right/SyncPlayback/Play").GetComponent<Button>().onClick.AddListener(() => {
+                SetError("");
+                HandyConnection.SyncPlay(0, null, SetError);
+            });
+            transform.Find("Body/Right/SyncPlayback/Pause").GetComponent<Button>().onClick.AddListener(() => {
+                SetError("");
+                HandyConnection.SyncPause(null, SetError);
+            });
+            
+            //Sync Offset
+            var syncOffset = transform.Find("Body/Right/SyncOffset").GetComponent<Slider>();
+            var syncOffsetValue = transform.Find("Body/Right/SyncOffset/InputField").GetComponent<InputField>();
+            syncOffset.onValueChanged.AddListener(newValue => syncOffsetValue.text = newValue.ToString("0"));
+            transform.Find("Body/Right/SyncOffset/Set").GetComponent<Button>().onClick.AddListener(() =>
+            {
+                SetError("");
+                HandyConnection.SyncOffset((int)syncOffset.value, null, SetError);
+            });
+            
+            //Generate a CSV file on the handyfeeling.com servers from a generated list of position/time pairs
+            transform.Find("Body/Right/CreatePattern/Generate").GetComponent<Button>().onClick.AddListener(() => {
+                SetError("");
+                HandyConnection.PatternToUrl(GetPattern(
+                    transform.Find("Body/Right/CreatePattern/TypeDropdown").GetComponent<Dropdown>().value,
+                    (int)transform.Find("Body/Right/CreatePattern/RepeatsSlider").GetComponent<Slider>().value,
+                    (int)transform.Find("Body/Right/CreatePattern/SpeedSlider").GetComponent<Slider>().value
+                ), url => transform.Find("Body/Right/CreatePattern/Url").GetComponent<InputField>().text = url,
+                    SetError);
+            });
+            var repeats = transform.Find("Body/Right/CreatePattern/RepeatsSlider").GetComponent<Slider>();
+            var repeatsValue = transform.Find("Body/Right/CreatePattern/RepeatsSlider/InputField").GetComponent<InputField>();
+            repeats.onValueChanged.AddListener(newValue => repeatsValue.text = newValue.ToString("0"));
+            var speed = transform.Find("Body/Right/CreatePattern/SpeedSlider").GetComponent<Slider>();
+            var speedValue = transform.Find("Body/Right/CreatePattern/SpeedSlider/InputField").GetComponent<InputField>();
+            speed.onValueChanged.AddListener(newValue => speedValue.text = newValue.ToString("0"));
+        }
+
+        //This is an example showing how to generate patterns to be converted into CSV for playback
+        //It just creates repeating strokes that match a particular tempo and pattern
+        //You can create any kind of pattern you like, so long as it comes as an array of Vector2Ints
+        //The X value is the time, in milliseconds, from the beginning of the pattern
+        //The Y value is the stroke position. Note that this is multiplied by the stroke setting on the Handy!
+        //So if someone has Stroke set to 60% on their Handy, a value of 50 in your pattern will end up being position = 30%
+        private Vector2Int[] GetPattern(int patternType, int repeats, int bpm)
+        {
+            var commandList = new List<Vector2Int>();
+
+            //length of a bar in milliseconds
+            var barTime = (int)(4000f * (60f / bpm));
+            
+            for (var i = 0; i < repeats; i++) {
+                var startTime = i * barTime;
+                switch (patternType) {
+                    case 0: //slow
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (0f / 4f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (1f / 4f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (2f / 4f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (3f / 4f)), 100));
+                        break;
+                    case 1: //123 slow
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (0f / 8f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (1f / 8f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (2f / 8f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (3f / 8f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (4f / 8f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (5f / 8f)), 100));
+                        
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (7f / 8f)), 100));
+                        break;
+                    case 2: //normal
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (0f / 8f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (1f / 8f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (2f / 8f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (3f / 8f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (4f / 8f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (5f / 8f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (6f / 8f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (7f / 8f)), 100));
+                        break;
+                    case 3: //heartbeat
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (0f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (1f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (2f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (3f / 16f)), 100));
+                        
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (7f / 16f)), 100));
+                        
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (8f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (9f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (10f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (11f / 16f)), 100));
+                        
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (15f / 16f)), 100));
+                        break;
+                    case 4: //123 Fast
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (0f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (1f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (2f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (3f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (4f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (5f / 16f)), 100));
+                        
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (7f / 16f)), 100));
+                        
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (8f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (9f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (10f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (11f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (12f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (13f / 16f)), 100));
+                        
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (15f / 16f)), 100));
+                        break;
+                    case 5: //1234567
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (0f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (1f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (2f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (3f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (4f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (5f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (6f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (7f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (8f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (9f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (10f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (11f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (12f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (13f / 16f)), 100));
+                        
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (15f / 16f)), 100));
+                        break;
+                    case 6: //double time
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (0f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (1f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (2f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (3f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (4f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (5f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (6f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (7f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (8f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (9f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (10f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (11f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (12f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (13f / 16f)), 100));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (14f / 16f)), 0));
+                        commandList.Add(new Vector2Int((int)(startTime + barTime * (15f / 16f)), 100));
+                        break;
+                    default:
+                        throw new FormatException("Unexpected value " + patternType + " for pattern type!");
+                }
+            }
+
+            return commandList.ToArray();
         }
 
         private void SetError(string error)
         {
+            Debug.Log(error);
             if (_errorText == null) _errorText = transform.Find("Footer/ErrorText").GetComponent<Text>();
             _errorText.text = error;
         }
