@@ -44,7 +44,7 @@ namespace Defucilis.TheHandyUnity
             //For these situations, we want to subscribe to the OnStatusChanged event to make sure we update the UI
             HandyConnection.OnStatusChanged += newStatus =>
             {
-                transform.Find("Body/Middle/SetMode").GetComponent<Dropdown>().value = (int) newStatus;
+                transform.Find("Body/Middle/ControlMode/Dropdown").GetComponent<Dropdown>().value = (int) newStatus;
             };
 
             //Load connection key from PlayerPrefs, if it exists (and display in the UI)
@@ -108,10 +108,18 @@ namespace Defucilis.TheHandyUnity
             //These operations are for controlling the Handy directly, setting speed, stroke, etc
             
             //Set Handy mode
-            transform.Find("Body/Middle/SetMode/Set").GetComponent<Button>().onClick.AddListener(() =>
+            transform.Find("Body/Middle/ControlMode/Set").GetComponent<Button>().onClick.AddListener(() =>
             {
                 SetError("");
-                HandyConnection.SetMode((HandyMode)transform.Find("Body/Middle/SetMode").GetComponent<Dropdown>().value, 
+                HandyConnection.SetMode((HandyMode)transform.Find("Body/Middle/ControlMode/Dropdown").GetComponent<Dropdown>().value, 
+                    null, SetError);
+            });
+            
+            //Toggle Handy mode
+            transform.Find("Body/Middle/ControlMode/Toggle").GetComponent<Button>().onClick.AddListener(() =>
+            {
+                SetError("");
+                HandyConnection.ToggleMode((HandyMode)transform.Find("Body/Middle/ControlMode/Dropdown").GetComponent<Dropdown>().value, 
                     null, SetError);
             });
             
