@@ -1,6 +1,6 @@
 ﻿namespace Defucilis.TheHandyUnity
 {
-	public enum HandyStatus
+	public enum HandyMode
 	{
 		Off = 0,
 		Automatic = 1,
@@ -19,7 +19,7 @@
 
 	public struct HandyStatusData
 	{
-		public HandyStatus Status;
+		public HandyMode Mode;
 		public float CurrentPosition;
 		public float Speed;
 		public float Stroke;

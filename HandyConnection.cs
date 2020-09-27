@@ -1,30 +1,53 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using UnityEditor;
 using UnityEngine;
-using UnityEngine.Networking;
 
 
 namespace Defucilis.TheHandyUnity
 {
-    public class HandyConnection
+    public static class HandyConnection
     {
-        private static readonly HttpClient Client = new HttpClient();
-        
+        /// <summary>
+        /// The Handy connection key - required for all API functionality!
+        /// </summary>
         public static string ConnectionKey { get; set; }
-        public static HandyStatus Status { get; set; }
+        
+        /// <summary>
+        /// The last known status of the Handy. Call GetStatus if you need to be certain of the actual current status.
+        /// </summary>
+        public static HandyMode Mode { get; set; }
+        
+        /// <summary>
+        /// The offset time for server synchronisation, defaults to zero and is updated when you call GetServerTime
+        /// </summary>
         public static long ServerTimeOffset { get; private set; }
+        
+        /// <summary>
+        /// Mode for generating Unity Debug logs
+        /// </summary>
         public static HandyLogMode LogMode { get; set; }
 
+        /// <summary>
+        /// Callback whenever an event starts - use to display loading feedback or to make sure you don't call multiple events at once
+        /// </summary>
         public static Action OnCommandStart { get; set; }
+        
+        /// <summary>
+        /// Callback whenever an event ends - use to hide loading feedback etc
+        /// </summary>
         public static Action OnCommandEnd { get; set; }
-        public static Action<HandyStatus> OnStatusChanged { get; set; }
+        
+        /// <summary>
+        /// Callback whenever the Handy status changes.
+        /// Some functions change the status automatically, such as SetSpeed enabling AutomaticMode, and SyncPrepare enabling Sync mode
+        /// </summary>
+        public static Action<HandyMode> OnStatusChanged { get; set; }
+        
+        private static readonly HttpClient Client = new HttpClient();
 
         //============================================================================================================//
         //                                                                                                            //
@@ -32,54 +55,74 @@ namespace Defucilis.TheHandyUnity
         //                                                                                                            //
         //============================================================================================================//
 
-        public static void SetMode(HandyStatus status, Action<HandyStatus> onSuccess = null, Action<string> onError = null)
+        /// <summary>
+        /// Sets the Mode for the Handy.
+        /// </summary>
+        /// <param name="mode">The new mode the device should be in</param>
+        /// <param name="onSuccess">Callback indicating success, contains the newly set mode</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
+        public static void SetMode(HandyMode mode, Action<HandyMode> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
                 "Set Mode", 
                 async () => {
                     var response = await GetAsync(GetUrl("setMode", new Dictionary<string, string>
                     {
-                        {"mode", ((int)status).ToString()}
+                        {"mode", ((int)mode).ToString()}
                     }));
                     return response;
                 }, 
                 responseJson =>
                 {
-                    var newStatus = (HandyStatus) responseJson["mode"].AsInt;
-                    if(Status != newStatus) OnStatusChanged?.Invoke(newStatus);
-                    Status = newStatus;
+                    var newStatus = (HandyMode) responseJson["mode"].AsInt;
+                    if(Mode != newStatus) OnStatusChanged?.Invoke(newStatus);
+                    Mode = newStatus;
                     onSuccess?.Invoke(newStatus);
                 }, 
                 onError
             );
         }
         
-        public static void ToggleMode(HandyStatus status, Action<HandyStatus> onSuccess = null, Action<string> onError = null)
+        /// <summary>
+        /// Toggles between the OFF mode, and the specified mode
+        /// </summary>
+        /// <param name="mode">The device is toggled between OFF and this mode</param>
+        /// <param name="onSuccess">Callback indicating success, contains the newly set mode</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
+        public static void ToggleMode(HandyMode mode, Action<HandyMode> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
                 "Toggle Mode", 
                 async () => {
                     var response = await GetAsync(GetUrl("toggleMode", new Dictionary<string, string>
                     {
-                        {"mode", ((int)status).ToString()}
+                        {"mode", ((int)mode).ToString()}
                     }));
                     return response;
                 }, 
                 responseJson =>
                 {
-                    var newStatus = (HandyStatus) responseJson["mode"].AsInt;
-                    if(Status != newStatus) OnStatusChanged?.Invoke(newStatus);
-                    Status = newStatus;
+                    var newStatus = (HandyMode) responseJson["mode"].AsInt;
+                    if(Mode != newStatus) OnStatusChanged?.Invoke(newStatus);
+                    Mode = newStatus;
                     onSuccess?.Invoke(newStatus);
                 }, 
                 onError
             );
         }
 
+        /// <summary>
+        /// Sets the speed of the Handy as a percentage of its maximum speed of 400 mm/s.  This puts the Handy in Automatic mode, if it wasn't already.
+        /// </summary>
+        /// <param name="percent">The speed as a percentage (0 to 100)</param>
+        /// <param name="onSuccess">Callback indicating success, contains the current Handy position</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static void SetSpeedPercent(int percent, Action<HandyStatusData> onSuccess = null, Action<string> onError = null)
         {
+            percent = Mathf.Clamp(percent, 0, 100);
+            
             //ensure we're in automatic mode before setting speed
-            EnforceMode(HandyStatus.Automatic, () =>
+            EnforceMode(HandyMode.Automatic, () =>
             {
                 DoCommand(
                     "Set Speed (Percent)", 
@@ -103,10 +146,18 @@ namespace Defucilis.TheHandyUnity
             }, onError);
         }
         
+        /// <summary>
+        /// Sets the speed of the Handy in mm/s. This puts the Handy in Automatic mode, if it wasn't already.
+        /// </summary>
+        /// <param name="speedMm">The speed in mm/s - 400 is the maximum value</param>
+        /// <param name="onSuccess">Callback indicating success, contains the current Handy position</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static void SetSpeed(float speedMm, Action<HandyStatusData> onSuccess = null, Action<string> onError = null)
         {
+            speedMm = Mathf.Clamp(speedMm, 0f, 400f);
+            
             //ensure we're in automatic mode before setting speed
-            EnforceMode(HandyStatus.Automatic, () =>
+            EnforceMode(HandyMode.Automatic, () =>
             {
                 DoCommand(
                     "Set Speed (mm)", 
@@ -130,10 +181,15 @@ namespace Defucilis.TheHandyUnity
             }, onError);
         }
         
+        /// <summary>
+        /// Adds 10% to the speed of the Handy.  This puts the Handy in Automatic mode, if it wasn't already.
+        /// </summary>
+        /// <param name="onSuccess">Callback indicating success, contains the new speed data in mm/s and as a percentage</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static void StepSpeedUp(Action<HandySpatialData> onSuccess = null, Action<string> onError = null)
         {
             //ensure we're in automatic mode before setting speed
-            EnforceMode(HandyStatus.Automatic, () =>
+            EnforceMode(HandyMode.Automatic, () =>
             {
                 DoCommand(
                     "Step Speed Up", 
@@ -157,10 +213,15 @@ namespace Defucilis.TheHandyUnity
             }, onError);
         }
         
+        /// <summary>
+        /// Subtracts 10% from the speed of the Handy.  This puts the Handy in Automatic mode, if it wasn't already.
+        /// </summary>
+        /// <param name="onSuccess">Callback indicating success, contains the new speed data in mm/s and as a percentage</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static void StepSpeedDown(Action<HandySpatialData> onSuccess = null, Action<string> onError = null)
         {
             //ensure we're in automatic mode before setting speed
-            EnforceMode(HandyStatus.Automatic, () =>
+            EnforceMode(HandyMode.Automatic, () =>
             {
                 DoCommand(
                     "Step Speed Down", 
@@ -184,8 +245,16 @@ namespace Defucilis.TheHandyUnity
             }, onError);
         }
 
+        /// <summary>
+        /// Sets the stroke length of the Handy as a percentage. This works in Automatic mode and in Sync mode.
+        /// </summary>
+        /// <param name="percent">The stroke length as a percentage (0 to 100)</param>
+        /// <param name="onSuccess">Callback indicating success, contains the current Handy position</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static void SetStrokePercent(int percent, Action<HandyStatusData> onSuccess = null, Action<string> onError = null)
         {
+            percent = Mathf.Clamp(percent, 0, 100);
+            
             DoCommand(
                 "Set Stroke (Percent)", 
                 async () => {
@@ -207,8 +276,16 @@ namespace Defucilis.TheHandyUnity
             );
         }
         
+        /// <summary>
+        /// Sets the stroke length of the Handy in mm. The maximum value is 200
+        /// </summary>
+        /// <param name="strokeMm">The stroke length in mm (0 to 200)</param>
+        /// <param name="onSuccess">Callback indicating success, contains the current Handy position</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static void SetStroke(float strokeMm, Action<HandyStatusData> onSuccess = null, Action<string> onError = null)
         {
+            strokeMm = Mathf.Clamp(strokeMm, 0f, 200f);
+            
             DoCommand(
                 "Set Stroke (mm)", 
                 async () => {
@@ -230,6 +307,11 @@ namespace Defucilis.TheHandyUnity
             );
         }
         
+        /// <summary>
+        /// Adds 10% to the stroke length of the Handy
+        /// </summary>
+        /// <param name="onSuccess">Callback indicating success, contains the new stroke data in mm and as a percentage</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static void StepStrokeUp(Action<HandySpatialData> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
@@ -253,6 +335,11 @@ namespace Defucilis.TheHandyUnity
             );
         }
         
+        /// <summary>
+        /// Subtracts 10% from the stroke length of the Handy
+        /// </summary>
+        /// <param name="onSuccess">Callback indicating success, contains the new stroke data in mm and as a percentage</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static void StepStrokeDown(Action<HandySpatialData> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
@@ -282,6 +369,12 @@ namespace Defucilis.TheHandyUnity
         //                                                                                                            //
         //============================================================================================================//
         
+        /// <summary>
+        /// Gets the current firmware version of the Handy, as well as the latest available firmware version
+        /// Use this to display a message to the user indicating that a new firmware version is available for their Handy
+        /// </summary>
+        /// <param name="onSuccess">Callback indicating success, contains the current and latest available firmware versions as strings</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static void GetVersion(Action<HandyVersionData> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
@@ -301,6 +394,11 @@ namespace Defucilis.TheHandyUnity
             );
         }
         
+        /// <summary>
+        /// Gets the mode, position, speed and stroke values from the Handy
+        /// </summary>
+        /// <param name="onSuccess">Callback indicating success, contains the current mode, position, speed and stroke values (as percentages)</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static void GetSettings(Action<HandyStatusData> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
@@ -311,13 +409,13 @@ namespace Defucilis.TheHandyUnity
                 }, 
                 responseJson =>
                 {
-                    var newStatus = (HandyStatus) responseJson["mode"].AsInt;
-                    if (newStatus != Status) OnStatusChanged?.Invoke(newStatus);
+                    var newStatus = (HandyMode) responseJson["mode"].AsInt;
+                    if (newStatus != Mode) OnStatusChanged?.Invoke(newStatus);
                     
-                    Status = newStatus;
+                    Mode = newStatus;
                     onSuccess?.Invoke(new HandyStatusData()
                     {
-                        Status = newStatus,
+                        Mode = newStatus,
                         CurrentPosition = responseJson["position"].AsFloat,
                         Speed = responseJson["speed"].AsFloat,
                         Stroke = responseJson["stroke"].AsFloat
@@ -327,7 +425,13 @@ namespace Defucilis.TheHandyUnity
             );
         }
         
-        public static void GetStatus(Action<HandyStatus> onSuccess = null, Action<string> onError = null)
+        /// <summary>
+        /// Gets the current mode of the Handy. This is the best way to determine whether the Handy is connected
+        /// This also updates the Mode property on the HandyConnection class
+        /// </summary>
+        /// <param name="onSuccess">Callback indicating success, contains the current mode of the device</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
+        public static void GetStatus(Action<HandyMode> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
                 "Get Status", 
@@ -336,7 +440,7 @@ namespace Defucilis.TheHandyUnity
                     return response;
                 }, 
                 responseJson => {
-                    onSuccess?.Invoke(HandyStatus.Off);
+                    onSuccess?.Invoke(HandyMode.Off);
                 }, 
                 onError
             );
@@ -348,6 +452,14 @@ namespace Defucilis.TheHandyUnity
         //                                                                                                            //
         //============================================================================================================//
 
+        /// <summary>
+        /// Runs a series of checks to determine the server time sync offset value
+        /// This is important if you want the Handy's movements to stay in-sync with locally-playing video content!
+        /// Once this function completes, the value of ServerTimeOffset is automatically updated, and will be applied whenever relevant
+        /// </summary>
+        /// <param name="trips">How many requests to make. The offset value is the average offset time for each trip. Accuracy improves with more trips, the API recommends 30</param>
+        /// <param name="onSuccess">Callback indicating success, contains the newly calculated server time offset</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static async void GetServerTime(int trips = 30, Action<long> onSuccess = null, Action<string> onError = null)
         {
             const string commandDescription = "Get Server Time";
@@ -391,6 +503,14 @@ namespace Defucilis.TheHandyUnity
             OnCommandEnd?.Invoke();
         }
 
+        /// <summary>
+        /// Sends a CSV control file to the Handy for sync playback. This file needs to be hosted at a static URL. To get a static URL, use the PatternToURL function.
+        /// </summary>
+        /// <param name="url">The URL the CSV file is hosted at</param>
+        /// <param name="fileName">Optional filename parameter. If the filename and fileSize match what is already loaded on the Handy, loading will be skipped</param>
+        /// <param name="fileSize">Optional filesize parameter (in bytes). If the filename and fileSize match what is already loaded on the Handy, loading will be skipped</param>
+        /// <param name="onSuccess">Callback indicating success, indicates that the Handy is ready for sync playback</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static void SyncPrepare(string url, string fileName = "", int fileSize = -1, Action onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
@@ -409,9 +529,9 @@ namespace Defucilis.TheHandyUnity
                 }, 
                 responseJson => {
                     //This command sets the Handy mode to Sync automatically
-                    if (Status != HandyStatus.Sync) {
-                        Status = HandyStatus.Sync;
-                        OnStatusChanged?.Invoke(Status);
+                    if (Mode != HandyMode.Sync) {
+                        Mode = HandyMode.Sync;
+                        OnStatusChanged?.Invoke(Mode);
                     }
 
                     onSuccess?.Invoke();
@@ -420,10 +540,16 @@ namespace Defucilis.TheHandyUnity
             );
         }
 
+        /// <summary>
+        /// Begins playback of the last loaded sync file
+        /// </summary>
+        /// <param name="time">Playback time to start from, in milliseconds from the beginning of the file</param>
+        /// <param name="onSuccess">Callback indicating success, contains whether the device is now playing back a file (should be true), and also contains the sync offset value as previously set</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static void SyncPlay(int time = 0, Action<HandyPlayingData> onSuccess = null, Action<string> onError = null)
         {
             //Ensure we're in sync mode before sync playing
-            EnforceMode(HandyStatus.Sync, () =>
+            EnforceMode(HandyMode.Sync, () =>
             {
                 DoCommand(
                     "Sync Play",
@@ -455,6 +581,11 @@ namespace Defucilis.TheHandyUnity
             }, onError);
         }
         
+        /// <summary>
+        /// Pauses playback of the last loaded sync file (if it is already playing)
+        /// </summary>
+        /// <param name="onSuccess">Callback indicating success, contains whether the device is now playing back a file (should be false)</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static void SyncPause(Action<HandyPlayingData> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
@@ -482,6 +613,12 @@ namespace Defucilis.TheHandyUnity
             );
         }
 
+        /// <summary>
+        /// Sets the sync offset value - this is to tweak the playback time of the Handy sync playback to better match on-screen visuals, and must be done by the end-user
+        /// </summary>
+        /// <param name="offset">The new offset time in milliseconds (can be negative)</param>
+        /// <param name="onSuccess">Callback indicating success, contains the newly set sync offset value</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static void SyncOffset(int offset, Action<HandyPlayingData> onSuccess = null, Action<string> onError = null)
         {
             DoCommand(
@@ -506,6 +643,14 @@ namespace Defucilis.TheHandyUnity
             );
         }
 
+        /// <summary>
+        /// Converts a list of time/position pairs to a CSV file hosted on Handy's servers, ready to be loaded onto a Handy using PrepareSync
+        /// </summary>
+        /// <param name="patternData">The data to be converted.
+        /// The x coordinate represents the time in milliseconds from the beginning of the file
+        /// The y coordinate represents the position as a percentage of the current stroke value that the Handy should be at, at the given time value</param>
+        /// <param name="onSuccess">Callback indicating success, contains the URL of the newly created CSV file</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
         public static async void PatternToUrl(Vector2Int[] patternData, Action<string> onSuccess = null, Action<string> onError = null)
         {
             const string commandDescription = "Pattern to URL";
@@ -543,6 +688,84 @@ namespace Defucilis.TheHandyUnity
             }
         }
         
+        /// <summary>
+        /// Converts a funscript to a CSV file hosted on Handy's servers, ready to be loaded onto a Handy using PrepareSync
+        /// </summary>
+        /// <param name="funscript">The funscript to be loaded, as a string</param>
+        /// <param name="onSuccess">Callback indicating success, contains the URL of the newly created CSV file</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
+        public static async void FunscriptToUrl(string funscript, Action<string> onSuccess = null, Action<string> onError = null)
+        {
+            const string commandDescription = "Funscript to URL";
+            OnCommandStart?.Invoke();
+            TryLogVerbose(commandDescription);
+
+            if (string.IsNullOrEmpty(funscript)) {
+                TryLogError(commandDescription, "No funscript provided", onError);
+                OnCommandEnd?.Invoke();
+                return;
+            }
+
+            try {
+                var bytes = Encoding.ASCII.GetBytes(funscript);
+
+                var response = await PostAsync(
+                    "https://www.handyfeeling.com/api/sync/upload", 
+                    $"UnityGenerated_{DateTimeOffset.Now.ToUnixTimeMilliseconds()}.funscript", 
+                    new MemoryStream(bytes)
+                );
+                var responseJson = JSONNode.Parse(response);
+                TryLogResponse(commandDescription, responseJson);
+
+                var url = responseJson["url"] == null ? "" : (string) responseJson["url"];
+                onSuccess?.Invoke(url);
+                OnCommandEnd?.Invoke();
+            } catch (Exception e) {
+                TryLogError(commandDescription, "Unexpected error: " + e.Message, onError);
+                OnCommandEnd?.Invoke();
+            }
+        }
+        
+        /// <summary>
+        /// Uploads a CSV file to Handy's servers, ready to be loaded onto a Handy using PrepareSync
+        /// </summary>
+        /// <param name="csv">The CSV to be loaded, as a string. Each line should be in the format [time (ms)],[position (%)]</param>
+        /// <param name="onSuccess">Callback indicating success, contains the URL of the newly uploaded CSV file</param>
+        /// <param name="onError">Callback indicating failure, contains the error message</param>
+        public static async void CsvToUrl(string csv, Action<string> onSuccess = null, Action<string> onError = null)
+        {
+            const string commandDescription = "CSV to URL";
+            OnCommandStart?.Invoke();
+            TryLogVerbose(commandDescription);
+
+            if (string.IsNullOrEmpty(csv)) {
+                TryLogError(commandDescription, "No CSV provided", onError);
+                OnCommandEnd?.Invoke();
+                return;
+            }
+
+            try {
+                var bytes = Encoding.ASCII.GetBytes(csv);
+
+                var response = await PostAsync(
+                    "https://www.handyfeeling.com/api/sync/upload", 
+                    $"UnityGenerated_{DateTimeOffset.Now.ToUnixTimeMilliseconds()}.csv", 
+                    new MemoryStream(bytes)
+                );
+                var responseJson = JSONNode.Parse(response);
+                TryLogResponse(commandDescription, responseJson);
+
+                var url = responseJson["url"] == null ? "" : (string) responseJson["url"];
+                onSuccess?.Invoke(url);
+                OnCommandEnd?.Invoke();
+            } catch (Exception e) {
+                TryLogError(commandDescription, "Unexpected error: " + e.Message, onError);
+                OnCommandEnd?.Invoke();
+            }
+        }
+        
+        
+        
         
         //============================================================================================================//
         //============================================================================================================//
@@ -555,9 +778,9 @@ namespace Defucilis.TheHandyUnity
         //============================================================================================================//
 
 
-        private static void EnforceMode(HandyStatus mode, Action command, Action<string> onError)
+        private static void EnforceMode(HandyMode mode, Action command, Action<string> onError)
         {
-            if (Status != mode) {
+            if (Mode != mode) {
                 SetMode(mode, status => command(), onError);
             } else {
                 command();

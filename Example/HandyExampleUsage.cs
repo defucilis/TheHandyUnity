@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -78,7 +77,7 @@ namespace Defucilis.TheHandyUnity
                 HandyConnection.GetSettings(data =>
                 {
                     transform.Find("Body/Left/GetSettings").GetComponent<InputField>().text =
-                        $"Mode: {data.Status}\n" +
+                        $"Mode: {data.Mode}\n" +
                         $"Position: {data.CurrentPosition}\n" +
                         $"Speed: {data.Speed}\n" +
                         $"Stroke: {data.Stroke}";
@@ -107,7 +106,7 @@ namespace Defucilis.TheHandyUnity
             transform.Find("Body/Middle/SetMode/Set").GetComponent<Button>().onClick.AddListener(() =>
             {
                 SetError("");
-                HandyConnection.SetMode((HandyStatus)transform.Find("Body/Middle/SetMode").GetComponent<Dropdown>().value, 
+                HandyConnection.SetMode((HandyMode)transform.Find("Body/Middle/SetMode").GetComponent<Dropdown>().value, 
                     null, SetError);
             });
             
