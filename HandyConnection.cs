@@ -9,6 +9,9 @@ using UnityEngine;
 
 namespace Defucilis.TheHandyUnity
 {
+    /// <summary>
+    /// Main class for accessing Handy functions
+    /// </summary>
     public static class HandyConnection
     {
         /// <summary>

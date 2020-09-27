@@ -6,6 +6,10 @@ using UnityEngine.UI;
 
 namespace Defucilis.TheHandyUnity
 {
+    /// <summary>
+    /// This class contains examples of how to use every function in the API
+    /// For ease of exploration, all functions have been made accessible through the Unity UI
+    /// </summary>
     public class HandyExampleUsageUI : MonoBehaviour
     {
         public HandyLogMode LogMode = HandyLogMode.Verbose;
