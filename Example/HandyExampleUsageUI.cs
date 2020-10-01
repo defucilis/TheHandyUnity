@@ -49,6 +49,7 @@ namespace Defucilis.TheHandyUnity
 
             //Load connection key from PlayerPrefs, if it exists (and display in the UI)
             _connectionKeyInputField = transform.Find("Body/Left/ConnectionKeyInput").GetComponent<InputField>();
+            _connectionKeyInputField.onValueChanged.AddListener(newValue => HandyConnection.ConnectionKey = newValue);
             if (PlayerPrefs.HasKey("ConnectionKey")) {
                 _connectionKeyInputField.text = PlayerPrefs.GetString("ConnectionKey");
                 HandyConnection.ConnectionKey = _connectionKeyInputField.text;
