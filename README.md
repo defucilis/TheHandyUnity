@@ -1,5 +1,7 @@
 # TheHandyUnity
 
+## This repo is deprecated with API v2. For a v2-compatible wrapper, check out Limitlessman's repo [here](https://github.com/LimitlessManMLB/TheHandyForUnity_APIv2)
+
 This is a wrapper for version 1.0.0 of the web API for The Handy male masturbator. You can learn more about the Handy at [www.thehandy.com](www.thehandy.com)
 
 The focus is on enabling all the functionality through async functions with callbacks in C#. I haven't included anything like synchronizing to animations, following GameObjects, etc. because it's hard to know what people want out of the SDK, and because a lot of that stuff would be super labor intensive for (I imagine) very few users. If you find yourself needing something like that, feel free to submit a pull request!
